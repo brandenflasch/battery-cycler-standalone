@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.dmg
+
+# Note: bin/ is NOT ignored - it contains bundled dependencies
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+
+# macOS
+.DS_Store
+
+# Logs and state (user-specific)
+*.log
+battery_cycle_state.txt
+battery_cycle_config.json
+battery_health.csv
