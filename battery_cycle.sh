@@ -115,6 +115,15 @@ disable_gpu_stress() {
     log "GPU-STRESS: Stopped"
 }
 
+# Ensure caffeinate is running (prevents sleep during cycling)
+ensure_caffeinate_running() {
+    if ! kill -0 $CAFFEINATE_PID 2>/dev/null; then
+        caffeinate -dims -w $$ &
+        CAFFEINATE_PID=$!
+        log "CAFFEINATE: Process died, restarted (PID: $CAFFEINATE_PID)"
+    fi
+}
+
 # Ensure stress processes are running during discharge (resilience)
 ensure_stress_running() {
     if [ "$CURRENT_STATE" != "discharging" ]; then
@@ -407,6 +416,9 @@ while true; do
     gpu_running=$(pgrep -f "ffmpeg.*videotoolbox" > /dev/null && echo "yes" || echo "no")
 
     echo "$(date '+%H:%M:%S') - Battery: $battery% | AppleHealth: ${apple_health}% | Source: $power_source | CPU: $cpu_running | GPU: $gpu_running | Cycles: $TOTAL_DISCHARGE_CYCLES | State: $CURRENT_STATE"
+
+    # Ensure caffeinate is running (prevents sleep)
+    ensure_caffeinate_running
 
     # Ensure stress processes are running during discharge (resilience check)
     ensure_stress_running
