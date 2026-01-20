@@ -9,6 +9,27 @@ import os
 import sys
 import signal
 
+VERSION = "2.1.0"
+BUILD_COMMIT = "2386633"  # Update with each release
+
+def get_version_string():
+    """Get version string with commit hash."""
+    # Try to get live git commit if in dev environment
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=script_dir,
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode == 0:
+            return f"v{VERSION} ({result.stdout.strip()})"
+    except:
+        pass
+    return f"v{VERSION} ({BUILD_COMMIT})"
+
 CONFIG_FILE = os.path.expanduser("~/battery_cycle_config.json")
 STATE_FILE = os.path.expanduser("~/battery_cycle_state.txt")
 LOG_FILE = os.path.expanduser("~/battery_cycles.log")
@@ -154,6 +175,10 @@ class BatteryCyclerApp(rumps.App):
         self.view_log_item = rumps.MenuItem("View Log", callback=self.view_log)
         self.show_stats_item = rumps.MenuItem("Show Stats", callback=self.show_stats)
 
+        # Version info
+        self.version_item = rumps.MenuItem(get_version_string(), callback=None)
+        self.version_item.set_callback(None)
+
         self.menu = [
             self.status_item,
             None,  # separator
@@ -172,6 +197,7 @@ class BatteryCyclerApp(rumps.App):
             self.view_log_item,
             self.show_stats_item,
             None,
+            self.version_item,
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
 
