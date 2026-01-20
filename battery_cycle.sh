@@ -115,6 +115,38 @@ disable_gpu_stress() {
     log "GPU-STRESS: Stopped"
 }
 
+# Ensure stress processes are running during discharge (resilience)
+ensure_stress_running() {
+    if [ "$CURRENT_STATE" != "discharging" ]; then
+        return
+    fi
+
+    # Check and restart CPU stress if needed
+    if [ "$CPU_STRESS" != "off" ] && ! pgrep -x "stress-ng" > /dev/null; then
+        log "CPU-STRESS: Process died, restarting..."
+        case "$CPU_STRESS" in
+            low)
+                "$STRESS_CMD" --cpu 2 --vm 1 --vm-bytes 1G --timeout 0 &
+                log "CPU-STRESS: Restarted LOW (2 CPU, 1GB RAM)"
+                ;;
+            medium)
+                "$STRESS_CMD" --cpu 4 --vm 2 --vm-bytes 2G --timeout 0 &
+                log "CPU-STRESS: Restarted MEDIUM (4 CPU, 2GB RAM)"
+                ;;
+            high)
+                "$STRESS_CMD" --cpu 0 --vm 4 --vm-bytes 4G --timeout 0 &
+                log "CPU-STRESS: Restarted HIGH (all CPUs, 4GB RAM)"
+                ;;
+        esac
+    fi
+
+    # Check and restart GPU stress if needed
+    if [ "$GPU_STRESS" != "off" ] && [ -n "$FFMPEG_CMD" ] && ! pgrep -f "ffmpeg.*videotoolbox" > /dev/null; then
+        log "GPU-STRESS: Process died, restarting..."
+        enable_gpu_stress "$GPU_STRESS"
+    fi
+}
+
 # Battery control via battery CLI (self-contained)
 enable_discharge() {
     # Set battery to discharge to lower limit
@@ -375,6 +407,9 @@ while true; do
     gpu_running=$(pgrep -f "ffmpeg.*videotoolbox" > /dev/null && echo "yes" || echo "no")
 
     echo "$(date '+%H:%M:%S') - Battery: $battery% | AppleHealth: ${apple_health}% | Source: $power_source | CPU: $cpu_running | GPU: $gpu_running | Cycles: $TOTAL_DISCHARGE_CYCLES | State: $CURRENT_STATE"
+
+    # Ensure stress processes are running during discharge (resilience check)
+    ensure_stress_running
 
     if [ "$battery" -le $LOWER_LIMIT ]; then
         if [ "$CURRENT_STATE" != "charging" ]; then
