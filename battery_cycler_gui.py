@@ -10,7 +10,7 @@ import sys
 import signal
 
 VERSION = "2.1.0"
-BUILD_COMMIT = "2386633"  # Update with each release
+BUILD_COMMIT = "bf3e094"  # Update with each release
 
 def get_version_string():
     """Get version string with commit hash."""
