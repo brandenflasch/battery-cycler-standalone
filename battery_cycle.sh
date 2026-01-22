@@ -137,7 +137,17 @@ ensure_caffeinate_running() {
 
 # Ensure stress processes are running during discharge (resilience)
 ensure_stress_running() {
+    # Only run stress during discharge - kill any stragglers if charging
     if [ "$CURRENT_STATE" != "discharging" ]; then
+        # Make sure stress is stopped if we're not discharging
+        if pgrep -x "stress-ng" > /dev/null; then
+            pkill -9 stress-ng 2>/dev/null
+            log "CPU-STRESS: Killed (not in discharge mode)"
+        fi
+        if pgrep -f "ffmpeg.*videotoolbox" > /dev/null; then
+            pkill -f "ffmpeg.*videotoolbox" 2>/dev/null
+            log "GPU-STRESS: Killed (not in discharge mode)"
+        fi
         return
     fi
 
