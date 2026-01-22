@@ -26,9 +26,15 @@ fi
 STRESS_CMD="$BIN_DIR/stress-ng"
 FFMPEG_CMD=$(command -v ffmpeg 2>/dev/null || echo "")  # Optional, use system ffmpeg
 
-# Prevent Mac from sleeping
-caffeinate -dims -w $$ &
+# Prevent Mac from sleeping and timer throttling
+# -d: prevent display sleep, -i: prevent idle sleep, -m: prevent disk sleep
+# -s: prevent sleep on AC power, -u: declare user activity (prevents timer coalescing)
+caffeinate -dimsu -w $$ &
 CAFFEINATE_PID=$!
+
+# Also create an IOKit power assertion to prevent App Nap and timer throttling
+pmset noidle &
+PMSET_PID=$!
 
 # Default config (overridden by config file)
 UPPER_LIMIT=80
@@ -118,9 +124,14 @@ disable_gpu_stress() {
 # Ensure caffeinate is running (prevents sleep during cycling)
 ensure_caffeinate_running() {
     if ! kill -0 $CAFFEINATE_PID 2>/dev/null; then
-        caffeinate -dims -w $$ &
+        caffeinate -dimsu -w $$ &
         CAFFEINATE_PID=$!
         log "CAFFEINATE: Process died, restarted (PID: $CAFFEINATE_PID)"
+    fi
+    if ! kill -0 $PMSET_PID 2>/dev/null; then
+        pmset noidle &
+        PMSET_PID=$!
+        log "PMSET: Process died, restarted (PID: $PMSET_PID)"
     fi
 }
 
@@ -329,6 +340,7 @@ cleanup() {
     log "========== SCRIPT STOPPED =========="
     log_health "script_stopped"
     kill $CAFFEINATE_PID 2>/dev/null
+    kill $PMSET_PID 2>/dev/null
     pkill -9 stress-ng 2>/dev/null
     disable_gpu_stress
 
