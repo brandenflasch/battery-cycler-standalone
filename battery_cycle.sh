@@ -42,7 +42,7 @@ LOWER_LIMIT=20
 CPU_STRESS="high"   # off, low, medium, high
 GPU_STRESS="off"    # off, low, medium, high
 
-CHECK_INTERVAL=30
+CHECK_INTERVAL=10  # Shorter interval to catch dead processes faster
 LOG_FILE=~/battery_cycles.log
 HEALTH_LOG=~/battery_health.csv
 STATE_FILE=~/battery_cycle_state.txt
@@ -135,8 +135,20 @@ ensure_caffeinate_running() {
     fi
 }
 
+# Track last check time to detect timer throttling
+LAST_STRESS_CHECK=0
+
 # Ensure stress processes are running during discharge (resilience)
 ensure_stress_running() {
+    local now=$(date +%s)
+    local elapsed=$((now - LAST_STRESS_CHECK))
+
+    # Log if check interval was much longer than expected (throttled)
+    if [ $LAST_STRESS_CHECK -gt 0 ] && [ $elapsed -gt 60 ]; then
+        log "WARNING: Check interval was ${elapsed}s (expected ~${CHECK_INTERVAL}s) - timer may have been throttled"
+    fi
+    LAST_STRESS_CHECK=$now
+
     # Only run stress during discharge - kill any stragglers if charging
     if [ "$CURRENT_STATE" != "discharging" ]; then
         # Make sure stress is stopped if we're not discharging
