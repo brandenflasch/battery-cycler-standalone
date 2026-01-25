@@ -189,10 +189,37 @@ ensure_stress_running() {
     fi
 }
 
+# Run battery command with timeout to prevent hanging (macOS compatible)
+run_battery_cmd() {
+    local cmd="$1"
+    local arg="$2"
+    local timeout_secs=30
+
+    # Run command in background
+    $BATTERY_CMD $cmd $arg 2>/dev/null &
+    local pid=$!
+
+    # Wait with timeout
+    local count=0
+    while kill -0 $pid 2>/dev/null; do
+        sleep 1
+        count=$((count + 1))
+        if [ $count -ge $timeout_secs ]; then
+            kill -9 $pid 2>/dev/null
+            wait $pid 2>/dev/null
+            log "WARNING: Battery command '$cmd $arg' timed out after ${timeout_secs}s"
+            return 1
+        fi
+    done
+
+    wait $pid
+    return $?
+}
+
 # Battery control via battery CLI (self-contained)
 enable_discharge() {
     # Set battery to discharge to lower limit
-    $BATTERY_CMD discharge $LOWER_LIMIT 2>/dev/null &
+    run_battery_cmd discharge $LOWER_LIMIT
     log "BATTERY: Discharge enabled (target: ${LOWER_LIMIT}%)"
 
     # Start CPU stress based on level (off, low, medium, high)
@@ -230,7 +257,7 @@ disable_discharge() {
     disable_gpu_stress
 
     # Set battery to charge to upper limit
-    $BATTERY_CMD charge $UPPER_LIMIT 2>/dev/null &
+    run_battery_cmd charge $UPPER_LIMIT
     log "BATTERY: Charging enabled (target: ${UPPER_LIMIT}%)"
 }
 
@@ -367,7 +394,7 @@ cleanup() {
     disable_gpu_stress
 
     # Restore battery to normal state (maintain at 80%)
-    $BATTERY_CMD maintain 80 2>/dev/null
+    run_battery_cmd maintain 80
 
     save_state
 
